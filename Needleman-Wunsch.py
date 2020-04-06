@@ -1,219 +1,119 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
-# Write your code here
-
-
-#Reading of input files
+#Needleman Wunsch Algo
 import sys
-with open(sys.argv[1],'r') as sequence1:
-	sequence1string=''
-	for line in sequence1:
-		if not line.startswith('>'):
-			sequence1string+=line.rstrip()
-		
-with open(sys.argv[2],'r') as sequence2:
-	sequence2string=''
-	for line in sequence2:
-		if not line.startswith('>'):
-			sequence2string+=line.rstrip()
 
+# open both files and read the sequences
+with open(sys.argv[1],'r') as file1:
+    next(file1)
+    for line in file1:
+        seq1 = line
+        print("Sequence1:", seq1)
+        m=len(seq1)+1 #plus one to add row for gap penalties
+        print(m)
 
-#Construction of the matrix with all zeros	
-matrix=[]		
-for row in range(len(sequence2string)+2):
-	j=[]
-	matrix.append(j)
+with open(sys.argv[2],'r') as file2:
+    next(file2)
+    for line in file2:
+        seq2 = line
+        print("Sequence2:", seq2, "\n")
+        n=len(seq2)+1 #plus one to add column for gap penalties
+        print(n)
 
-for column in range(len(sequence1string)+2):
-	for row in range(len(sequence2string)+2):
-		i=0
-		matrix[row].append(i)
+#initializing an alignment matrix and a pointer matrix
 
+alignMat = []
+for row in range(n):
+    j=[]
+    alignMat.append(j)
+for column in range(m):
+    for row in range(n):
+        i=0
+        alignMat[row].append(i)
+print(alignMat)
 
+pointer = []
+for row in range(n):
+    j=[]
+    pointer.append(j)
+for column in range(m):
+    for row in range(n):
+        i=0
+        pointer[row].append(i)
 
-#Initialilization of Matrix with sequence 1 and sequence 2 on horizontal and vertical axis
-for column in range(2,(len(matrix[0]))):
-		matrix[0][column]=sequence1string[column-2]	
-#print('Length of sequence1string is',len(sequence1string))	
-#print('No of columns are ',len(matrix[0]))
-#print('Sequence1 is ',sequence1string)	
-for row in range(2,len(matrix)):
-	matrix[row][0]=sequence2string[row-2]	
-#print('No of rows are ',len(matrix))
-#print('Length of sequence2string is',len(sequence2string))
-#print('Sequence2 is', sequence2string)
-	
+#adding gap penalties to the first row and column of the alignemnt matrix
+for i in range(n):
+    alignMat[i][0] = -1*i #for first column
+for j  in range(m):
+    alignMat[0][j] = -1*j #for first row
 
-#Matrix filling 
+#checking for match/mismatch
+def match(b1, b2):
+    if b1 == b2:
+        score = 1 #match score = 1
+        return score
+    else:
+        score = -1 #mismatch score = -1
+        return score
 
-matrix[0][0]=matrix[0][1]=matrix[1][0]=''
-for row in range(1,len(matrix)):
-	for column in range(1,len(matrix[0])):
-		if row==1 and column==1:
-			matrix[row][column]==0
-		elif row==1:
-			matrix[1][column]=matrix[1][column-1]-1
-		elif column==1:
-			matrix[row][1]=matrix[row-1][1]-1
-		else:
-			if matrix[row][0]==matrix[0][column]:
-				matrix[row][column]=max((matrix[row][column-1]-1),(matrix[row-1][column]-1),(matrix[row-1][column-1]+1))
-			else:
-				matrix[row][column]=max((matrix[row][column-1]-1),(matrix[row-1][column]-1),(matrix[row-1][column-1]-1))
-
-#print(matrix)
-
+#filling up the cells using the surrounding 3 cells
+max_score = 0
+for i in range(1,n):
+    for j in range(1,m):
+        diag = alignMat[i-1][j-1] + match(seq1[j-1],seq2[i-1])
+        up = alignMat[i-1][j] -1       #gap penalty = -1
+        left = alignMat[i][j-1] -1     #gap penalty = -1
+        alignMat[i][j] = max(diag,left,up) #maximum of the scores from the surrounding 3 cells goes into the current cell
+        if diag == up:
+            alignMat[i][j] == diag
+        if up == left:
+            alignMat[i][j] == up
         
-#Backtracking
+        if alignMat[i][j] == diag:
+            pointer[i][j] = 1
+        elif alignMat[i][j] == up:
+            pointer[i][j] = 2
+        elif alignMat[i][j] == left:
+            pointer[i][j] = 3
+        
+        if alignMat[i][j] >=max_score:
+            max_i = i
+            max_j = j
+            max_score = alignMat[i][j]  #trace back starts from the cell with max_score
 
-numberOfRows=len(matrix)
-numberOfColumns=len(matrix[0])
-currentRow=len(matrix)-1
-currentColumn=len(matrix[0])-1
-#highlightedElement=matrix[len(matrix)-1][len(matrix[0])-1]
-seq1,seq2=[],[]
-alignmentScore=matrix[len(matrix)-1][len(matrix[0])-1]
-def main(currentRow,currentColumn):
-	print(currentRow,currentColumn)
-	x=1
-	if currentRow==currentColumn==1:
-		x=0
-	elif (x!=0) and (currentColumn==1):
-		if matrix[currentRow][currentColumn]==(matrix[currentRow-1][currentColumn]-1):
-			highlightedElement=matrix[currentRow-1][currentColumn] #if highlighted element is a part of 1st row or 1st column it will always be backtracked to the element to the left of it and utop of it respectively
-			print(highlightedElement)
-			seq1.append('-')
-			seq2.append(matrix[currentRow][0])
-			currentRow,currentColumn=currentRow-1,currentColumn #current row and current column values are changed to the row and column of the new highlighted element
-			return main(currentRow,currentColumn)
-	elif x!=0 and currentRow==1:
-		if matrix[currentRow][currentColumn]==matrix[currentRow][currentColumn-1]-1:
-			highlightedElement=matrix[currentRow][currentColumn-1]
-			print(highlightedElement)
-			seq1.append(matrix[0][currentColumn])
-			seq2.append('-')
-			currentRow,currentColumn=currentRow,currentColumn-1
-			return main(currentRow,currentColumn)
-	elif x!=0:
-		if ((matrix[currentRow][currentColumn]==(matrix[currentRow-1][currentColumn-1]+1)) and (matrix[currentRow][0]==matrix[0][currentColumn])):
-			highlightedElement=matrix[currentRow-1][currentColumn-1] 
-			print(highlightedElement)
-			seq1.append(matrix[0][currentColumn])       
-			seq2.append(matrix[currentRow][0])
-			currentRow,currentColumn=currentRow-1,currentColumn-1
-			return main(currentRow,currentColumn)
-		elif ((matrix[currentRow][currentColumn]==(matrix[currentRow-1][currentColumn-1]-1)) and (matrix[currentRow][0]!=matrix[0][currentColumn])):
-			highlightedElement=matrix[currentRow-1][currentColumn-1] 
-			print(highlightedElement)
-			seq1.append(matrix[0][currentColumn])
-			seq2.append(matrix[currentRow][0])
-			currentRow,currentColumn=currentRow-1,currentColumn-1
-			return main(currentRow,currentColumn)
-		elif (matrix[currentRow][currentColumn]==(matrix[currentRow-1][currentColumn]-1)):
-			highlightedElement=matrix[currentRow-1][currentColumn]
-			print(highlightedElement)
-			seq1.append('-')
-			seq2.append(matrix[currentRow][0])
-			currentRow,currentColumn=currentRow-1,currentColumn
-			return main(currentRow,currentColumn)
-		elif (matrix[currentRow][currentColumn]==(matrix[currentRow][currentColumn-1]-1)):
-			highlightedElement=matrix[currentRow][currentColumn-1]
-			print(highlightedElement)
-			seq1.append(matrix[0][currentColumn])
-			seq2.append('-')
-			currentRow,currentColumn=currentRow,currentColumn-1
-			return main(currentRow,currentColumn)
-while currentRow!=1 and currentColumn !=1:
-	if currentColumn==1:
-		if matrix[currentRow][currentColumn]==(matrix[currentRow-1][currentColumn]-1):
-			highlightedElement=matrix[currentRow-1][currentColumn] #if highlighted element is a part of 1st row or 1st column it will always be backtracked to the element to the left of it and utop of it respectively
-			#print(highlightedElement)
-			seq1.append('-')
-			seq2.append(matrix[currentRow][0])
-			currentRow=currentRow-1 #current row and current column values are changed to the row and column of the new highlighted element
-	elif currentRow==1:
-		if matrix[currentRow][currentColumn]==matrix[currentRow][currentColumn-1]-1:
-			highlightedElement=matrix[currentRow][currentColumn-1]
-			#print(highlightedElement)
-			seq1.append(matrix[0][currentColumn])
-			seq2.append('-')
-			currentColumn=currentColumn-1
-	else:
-		if ((matrix[currentRow][currentColumn]==(matrix[currentRow-1][currentColumn-1]+1)) and (matrix[currentRow][0]==matrix[0][currentColumn])):
-			highlightedElement=matrix[currentRow-1][currentColumn-1] 
-			#print(highlightedElement)
-			seq1.append(matrix[0][currentColumn])       
-			seq2.append(matrix[currentRow][0])
-			currentRow,currentColumn=currentRow-1,currentColumn-1
-		elif ((matrix[currentRow][currentColumn]==(matrix[currentRow-1][currentColumn-1]-1)) and (matrix[currentRow][0]!=matrix[0][currentColumn])):
-			highlightedElement=matrix[currentRow-1][currentColumn-1] 
-			#print(highlightedElement)
-			seq1.append(matrix[0][currentColumn])
-			seq2.append(matrix[currentRow][0])
-			currentRow,currentColumn=currentRow-1,currentColumn-1
-		elif (matrix[currentRow][currentColumn]==(matrix[currentRow-1][currentColumn]-1)):
-			highlightedElement=matrix[currentRow-1][currentColumn]
-			#print(highlightedElement)
-			seq1.append('-')
-			seq2.append(matrix[currentRow][0])
-			currentRow,currentColumn=currentRow-1,currentColumn
-		elif (matrix[currentRow][currentColumn]==(matrix[currentRow][currentColumn-1]-1)):
-			highlightedElement=matrix[currentRow][currentColumn-1]
-			#print(highlightedElement)
-			seq1.append(matrix[0][currentColumn])
-			seq2.append('-')
-			currentRow,currentColumn=currentRow,currentColumn-1
-			
+#backtracking
+align1, align2 = "", "" #initial alignment
+i = max_i
+j = max_j
 
+while pointer[i][j] != 0: #to trace it back to the first or the top-left cell
+    if pointer[i][j] == 1: #1 is for diag
+        align1 = align1 + seq1[j-1]
+        align2 = align2 + seq2[i-1]
+        i = i -1
+        j = j -1
+    elif pointer[i][j] == 2: #2 is for up
+        align1 = align1 + "-"
+        align2 = align2 + seq2[i-1]
+        i = i -1
+    elif pointer[i][j] == 3: #3 is for left
+        align1 = align1 + seq1[j-1]
+        align2 = align2 + "-"
+        j = j -1
 
+align3 = "" #formatting the alignment of the sequences
 
+for i in range(len(align1)):
+    if align1[i] == align2[i]:
+        align3 = align3 + "|"
+    else:
+        align3 = align3 + " "
 
-			
-			
-			
-			
-			
-
-
-#main(currentRow,currentColumn)	
-#print(seq1)
-#print(seq2)	
-seq1string=''
-seq2string=''
-for i in range((len(seq1)-1),-1,-1):
-	seq1string+=seq1[i]
-
-for j in range((len(seq2)-1),-1,-1):
-	seq2string+=seq2[j]
-
-lines=''
-for index in range(len(seq1string)):
-	if seq1string[index]==seq2string[index]:
-		lines+='|'
-	else:
-		seq1string[index]!=seq2string[index]
-		lines+=' '
-
-print(seq1string)
-print(lines)
-print(seq2string)
-print('Alignment score:',alignmentScore)
-
-
-
-			
-			
-
-
-					
-
-
-	
-
-
-
- 	
-
-
-
-	
+#reversing the aligned sequences
+align1 = align1[::-1]
+align2 = align2[::-1]
+align3 = align3[::-1]
+print(align1)
+print(align3)
+print(align2)
+print("Alignment score =", max_score)
