@@ -4,71 +4,91 @@ import argparse
 import re
 import os
 import math
+import random
+import multiprocessing as mp
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-a",help="Enter an input genome:")
 parser.add_argument("-b",help="Enter another input genome:")
 parser.add_argument("-d","--dir",help="Enter a directory of input genomes:")
-parser.add_argument("-s", "--setsize",help="Enter the set size:", default = 1000)
-parser.add_argument("-S", "--seed",help="Give seed value for random generation:")
-parser.add_argument("-o", "--output", help="name of output file", default="genomeDist.txt")
-parser.add_argument("-t", "--threads",help="Enter the number of threads to run:", default = 1)
+parser.add_argument("-s",help="Enter the set size:", default = 1000)
+parser.add_argument("-S",help="Give seed value for random generation:")
+parser.add_argument("-o", help="name of output file", default = "genomeDist.txt")
+parser.add_argument("-t",help="Enter the number of threads to run:", default = 1)
 args = parser.parse_args()
 
 
 def calcDist(subset1, subset2):
-    jaccintersect = len(subset1.intersection(subset2))
-    jaccunion = len(subset1.union(subset2))
+    s1 = set(subset1)
+    s2 = set(subset2)
+    jaccintersect = len(s1.intersection(s2))
+    jaccunion = len(s1.union(s2))
     jaccindex = jaccintersect/jaccunion
-    
     jaccdist = 1-jaccindex
-    natlog = math.log(2(jaccdist)/(1+jaccdist))
-    mashdist = -(1/17)*natlog
+    var = 2*jaccdist/(1+jaccdist)
+    global mashdist
+    mashdist = str(-(1/17)*(math.log(var)))
     return mashdist
 
-def kmercounter(kmerinputfile):
-    with open(kmerinputfile) as f:
-        next(f) #to skip first line
-        lines = f.readlines()
-    y = ''.join(lines)
-    final = y.replace('\n', '')
+def kmercounter(kmerinputfile1, kmerinputfile2):
+    with open(kmerinputfile1) as f1:
+        next(f1) #to skip first line
+        lines1 = f1.readlines()
+    y1 = ''.join(lines1)
+    final1 = y1.replace('\n', '')
     sortList = []
     kmerList1 = []
+    kmerLength=17
+    rangeOfIndex = len(final1)-kmerLength
+    for i in range(rangeOfIndex+1):
+        kmerSeq = final1[i:i+kmerLength]
+        sortList.append(kmerSeq)
+        kmerSeqComp = kmerSeq[::-1]
+        sortList.append(kmerSeqComp)
+        sortList.sort()
+        kmerList1.append(sortList[0])
+        
+    with open(kmerinputfile2) as f2:
+        next(f2) #to skip first line
+        lines2 = f2.readlines()
+    y2 = ''.join(lines2)
+    final2 = y2.replace('\n', '')
+    sortList = []
     kmerList2 = []
     kmerLength=17
-    rangeOfIndex = len(final)-kmerLength
-    count = 0
+    rangeOfIndex = len(final2)-kmerLength
     for i in range(rangeOfIndex+1):
-        kmerSeq = final[i:i+kmerLength]
+        kmerSeq = final1[i:i+kmerLength]
+        sortList.append(kmerSeq)
         kmerSeqComp = kmerSeq[::-1]
-        sorList = [kmerSeq, kmerSeqComp]
+        sortList.append(kmerSeqComp)
         sortList.sort()
-        if kmerinputfile == inputfile1:
-            kmerList1.append(sortList[0])
-        elif kmerinputfile == inputfile2:
-            kmerList2.append(sortList[0])
+        kmerList2.append(sortList[0])
 
     #generating random kmers to evaluate
-    random.seed(args.S)
+    random.seed(int(args.S))
     random.shuffle(kmerList1)
-    subset1 = []
-    setsize = arg.s
-    for i in range(setsize):
-        subset1.append(kmerList1[i])
     random.shuffle(kmerList2)
-    subset2 = []
-    setsize = arg.s
-    for i in range(setsize):
-        subset2.append(kmerList2[i])
+    setsize = int(args.s)
+    subset1 = kmerList1[0:setsize]
+    subset2 = kmerList2[0:setsize]
+    print(len(subset2))
+    
+    #for i in range(setsize):
+     #   subset1.append(kmerList1[i])
+      #  print(len(subset1))
+       # subset2.append(kmerList2[i])
+        #print(len(subset2))
+
     calcDist(subset1, subset2)        
 
     
 def all2fasta(checkfile):
-    with open(checkfile):
+    with open(checkfile) as f:
         ext = re.search(pattern = "(.[A-Za-z]+)$", string =checkfile)
         ext = ext.group()
         inputFileName = checkfile.replace(ext, "")
-        lines = checkfile.readlines()
+        lines = f.readlines()
 
     if re.search(pattern = '^ID', string = lines[0]):
         #print("EMBL")
@@ -101,12 +121,12 @@ def all2fasta(checkfile):
                         outputfile.write(">" + accNum + "\n")
                     if lines[i].startswith('SQ'):
                         for j in range(i+1, len(lines)-1):
-                        seq = lines[j]
-                        seq = seq.split("     ")
-                        seq = seq[1]
-                        if re.findall(pattern = " ", string=seq):
-                            seq = seq.replace(" ", "")
-                            outputfile.write(seq+"\n")
+                            seq = lines[j]
+                            seq = seq.split("     ")
+                            seq = seq[1]
+                            if re.findall(pattern = " ", string=seq):
+                                seq = seq.replace(" ", "")
+                                outputfile.write(seq+"\n")
 
 
     if fileFormat == "genbank":
@@ -174,62 +194,77 @@ def all2fasta(checkfile):
     kmercounter(outputfile)
 
 #checking the correct file format
-def checkFasta(inputFile):
-    with open(inputFile) as f:
-#         header = f.readline()
-        lines = f.readlines()
-        if re.findall(pattern = '^[^BJOUXZbjouxz]+$', string = lines[1]):
-            print("Not a nucleotide file")
-            break
-        else:
-            if re.search(pattern = '^>\w+\d+', string = lines[0]):
+def checkFasta(inputFile1, inputFile2):
+    with open(inputFile1) as f1:
+        header1 = f1.readline()
+    with open(inputFile2) as f2:
+        header2 = f2.readline()
+        if re.search(pattern = '^>', string = header1):
+            if re.search(pattern = '^>', string = header2):
                 print("input file is in correct format")
-                kmercounter(inputFile)
-            else:
-                all2fasta(inputFile)
+                kmercounter(inputFile1, inputFile2)
+        else:
+            all2fasta(inputFile)
+        
 
                 
 def main(inputFile1, inputFile2):
-    checkFasta(inputFile1)
-    checkFasta(inputFile2)
+    checkFasta(inputFile1, inputFile2)
 
+if args.o:
+    print("ok")
     
-genomedistoutputfile = args.o              
-with open(genomedistoutputfile, 'w') as of:    
+with open(args.o, 'w') as of:    
     if args.a and args.b:        
-        inputFile1 = args.a
-        inputFile2 = args.b 
-        main()
+        inputfile1 = args.a
+        inputfile2 = args.b 
+        main(inputfile1, inputfile2)
         of.write("#"+inputfile1+"\t"+inputfile2+"\t"+mashdist)
-    if args.d:
-        dirname = args.d
-        listOfFiles = []
-        mashdict = {}
-        for file in os.listdir(dirname):
-            listOfFiles.append(file)
-            for i in range(len(listOfFiles)):
-                for j in range(len(listOfFiles)):
-                    inputfile1 = listOfFiles[i]
-                    inputfile2 = listOfFiles[j]
-                    main()
-                    of.write("\t"+listOfFiles+"\n")
-                    of.write(listOfFiles[j]+"\t"+mashdist+"\n")
+    elif args.d:
+        if args.t:
+            dirname = args.d
+            listOfFiles = []
+            tuplist= []
+            mashdict = {}
+            for file in os.listdir(dirname):
+                listOfFiles.append(file)
+                for i in listOfFiles:
+                    for j in listOfFiles:
+                        tupfile = (i,j)
+                        tuplist.append(tupfile)
+                p = mp.Pool(args.t)
+                m = starmap(main, tuplist)
+        if not args.t:
+            dirname = args.d
+            listOfFiles = []
+            mashdict = {}
+            for file in os.listdir(dirname):
+                listOfFiles.append(file)
+                for i in range(len(listOfFiles)):
+                    for j in range(len(listOfFiles)):
+                        inputfile1 = listOfFiles[i]
+                        inputfile2 = listOfFiles[j]
+                        main(inputfile1, inputfile2)
+                        of.write("\t"+listOfFiles+"\n")
+                        of.write(listOfFiles[j]+"\t"+mashdist+"\n")
                     
-    if args.a and args.d:
-        inputFile1 = args.a
+    elif args.a and args.d:
+        inputfile1 = args.a
         dirname = args.d
         listOfFiles = []
         for file in os.listdir(dirname):
             listOfFiles.append(file)
             for i in range(len(listOfFiles)):
                 inputfile2 = listOfFiles[i]
-                main()
+                main(inputfile1, inputfile2)
                 of.write("#filename"+"\t"+"genomeDist"+"\n")
                 of.write(inputfile2+"\t"+mashdist+"\n")
 
-    
-
-        
-
-            
-    
+    elif args.a:
+        if not args.b and args.d:
+            print("Only one input file given")
+            exit
+    elif args.b:
+        if not args.a and args.d:
+            print("Only one input file given")
+            exit
